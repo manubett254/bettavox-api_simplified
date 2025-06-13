@@ -152,3 +152,25 @@ def register_submit():
         if "duplicate key" in str(e).lower():
             return jsonify({"error": "Email already registered"}), 409
         return jsonify({"error": str(e)}), 500
+
+@routes.route("/predictions", methods=["GET"])
+def view_predictions():
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, audio_file, predicted_gender, predicted_age_group, confidence_score, timestamp FROM predictions ORDER BY id DESC LIMIT 20")
+        rows = cursor.fetchall()
+        cursor.close()
+        return jsonify([
+            {
+                "id": r[0],
+                "audio_file": r[1],
+                "gender": r[2],
+                "age_group": r[3],
+                "confidence": r[4],
+                "timestamp": r[5].isoformat()
+            }
+            for r in rows
+        ])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
