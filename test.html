@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>BettaVox API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 2rem;
+        }
+        input, button {
+            margin: 0.5rem 0;
+            padding: 0.5rem;
+            font-size: 1rem;
+        }
+        #output {
+            margin-top: 1rem;
+            white-space: pre-wrap;
+            background: #f4f4f4;
+            padding: 1rem;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<h2>🎙️ BettaVox API Tester</h2>
+
+<!-- Get API Key -->
+<label>Email: </label>
+<input type="email" id="emailInput" placeholder="Enter your email">
+<button onclick="getApiKey()">Get API Key</button>
+<br>
+<label>API Key: </label>
+<input type="text" id="apiKeyInput" placeholder="Paste API key here" style="width: 300px;">
+
+<br><br>
+
+<!-- Upload audio -->
+<input type="file" id="audioInput" accept="audio/*">
+<br>
+<button onclick="predict()">Predict</button>
+
+<div id="output"></div>
+
+<script>
+const baseURL = "http://localhost:5000"; // e.g. https://betta-api.onrender.com
+
+async function getApiKey() {
+    const email = document.getElementById("emailInput").value;
+    if (!email) {
+        alert("Please enter an email.");
+        return;
+    }
+
+    try {
+        const formData = new FormData();
+        formData.append("email", email);
+
+        const response = await fetch(`${baseURL}/register`, {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+            document.getElementById("apiKeyInput").value = data.api_key;
+            showOutput("✅ API Key generated!\n" + JSON.stringify(data, null, 2));
+        } else {
+            showOutput("❌ Error: " + data.error);
+        }
+    } catch (err) {
+        showOutput("❌ Request failed: " + err.message);
+    }
+}
+
+async function predict() {
+    const apiKey = document.getElementById("apiKeyInput").value;
+    const audioFile = document.getElementById("audioInput").files[0];
+
+    if (!apiKey || !audioFile) {
+        alert("Please provide both API key and audio file.");
+        return;
+    }
+
+    try {
+        const formData = new FormData();
+        formData.append("audio", audioFile);
+
+        const response = await fetch(`${baseURL}/predict`, {
+            method: "POST",
+            headers: {
+                "X-API-KEY": apiKey
+            },
+            body: formData
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+            showOutput("✅ Prediction:\n" + JSON.stringify(data, null, 2));
+        } else {
+            showOutput("❌ Error: " + data.error);
+        }
+    } catch (err) {
+        showOutput("❌ Request failed: " + err.message);
+    }
+}
+
+function showOutput(message) {
+    document.getElementById("output").innerText = message;
+}
+</script>
+
+</body>
+</html>
