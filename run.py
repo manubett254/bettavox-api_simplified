@@ -4,7 +4,10 @@ from app.routes import routes
 import os
 import logging
 import sys
-import sqlite3
+from dotenv import load_dotenv
+from app.database import init_db
+load_dotenv()
+
 
 
 # Logging Configuration
@@ -38,9 +41,13 @@ app = create_app()
 
 if __name__ == '__main__':
     logger.info("🚀 Starting Flask application...")
+    init_db()
     app.run(
         host='0.0.0.0',
         port=int(os.environ.get("PORT", 5000)), 
         use_reloader=False,    # Avoids multiple reloads manually
         debug=False
     )
+
+
+

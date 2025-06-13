@@ -3,9 +3,8 @@ from werkzeug.utils import secure_filename
 from app.utils import extract_features
 from app.model import load_assets
 from app.config import UPLOAD_FOLDER, ALLOWED_EXTENSIONS
-from app.database import init_db
+from app.database import get_db  # PostgreSQL connection function
 import pandas as pd
-import sqlite3
 import os
 import json
 import logging
@@ -15,15 +14,12 @@ from datetime import datetime
 routes = Blueprint("routes", __name__)
 logger = logging.getLogger(__name__)
 
-# Load all required models and assets once at startup
 (
     GENDER_MODELS, SCALER_GENDER, FEATURE_LIST,
     MODEL_STEP1, SCALER_STEP1, LABEL_ENCODER_STEP1,
     MODEL_STEP2, SCALER_STEP2, LABEL_ENCODER_STEP2
 ) = load_assets()
 
-# Initialize database
-init_db()
 
 def allowed_file(filename):
     return filename.lower().endswith(tuple(ALLOWED_EXTENSIONS))
@@ -34,39 +30,43 @@ def predict():
     api_key = request.headers.get("X-API-KEY")
     if not api_key:
         return jsonify({"error": "Missing API key"}), 401
-   
+
     logger.info(f"Received prediction request from API key: {api_key}")
 
-    # --- Validate API key ---
-    conn = sqlite3.connect("predictions.db")
+    conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, plan FROM users WHERE api_key = ?", (api_key,))
+
+    cursor.execute("SELECT id, plan FROM users WHERE api_key = %s", (api_key,))
     user = cursor.fetchone()
     if not user:
-        conn.close()
+        cursor.close()
         return jsonify({"error": "Invalid API key"}), 403
 
     user_id, plan = user
     today = datetime.now().strftime('%Y-%m-%d')
-    cursor.execute("SELECT request_count FROM usage WHERE user_id=? AND date=?", (user_id, today))
+    cursor.execute("SELECT request_count FROM usage WHERE user_id=%s AND date=%s", (user_id, today))
     row = cursor.fetchone()
 
-    # --- Enforce free plan limit ---
     if plan == "free":
         if row and row[0] >= 5:
-            conn.close()
+            cursor.close()
             return jsonify({"error": "Free plan limit reached (5/day)"}), 429
         elif row:
-            cursor.execute("UPDATE usage SET request_count = request_count + 1 WHERE user_id=? AND date=?", (user_id, today))
+            cursor.execute(
+                "UPDATE usage SET request_count = request_count + 1 WHERE user_id=%s AND date=%s",
+                (user_id, today)
+            )
         else:
-            cursor.execute("INSERT INTO usage (user_id, date, request_count) VALUES (?, ?, 1)", (user_id, today))
+            cursor.execute(
+                "INSERT INTO usage (user_id, date, request_count) VALUES (%s, %s, 1)",
+                (user_id, today)
+            )
 
-    # --- Handle uploaded audio ---
     file = request.files.get("audio")
     if not file or not allowed_file(file.filename):
-        conn.close()
+        cursor.close()
         return jsonify({"error": "No valid file uploaded"}), 400
-    
+
     if not file.mimetype.startswith('audio/'):
         return jsonify({"error": "Invalid file type. Audio only."}), 400
 
@@ -76,11 +76,9 @@ def predict():
     filepath = os.path.join(UPLOAD_FOLDER, random_filename)
     file.save(filepath)
 
-
-    # --- Extract features and predict ---
     features = extract_features(filepath)
     if features is None:
-        conn.close()
+        cursor.close()
         return jsonify({"error": "Failed to extract features"}), 500
 
     features_df = pd.DataFrame([features], columns=FEATURE_LIST)
@@ -109,23 +107,23 @@ def predict():
         age_group = LABEL_ENCODER_STEP2.inverse_transform([step2_pred_encoded])[0]
         age_confidence = MODEL_STEP2.predict_proba(features_scaled_step2)[0].max() * 100
 
-    # --- Log prediction and store in DB ---
     cursor.execute("""
         INSERT INTO predictions (
             audio_file, predicted_gender, predicted_age_group,
             confidence_score, gender_confidence, age_confidence,
             is_correct, features
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         filename, gender, age_group,
-        age_confidence, best_conf, age_confidence,
+        float(age_confidence), float(best_conf), float(age_confidence),
         -1, json.dumps([float(f) for f in features])
     ))
+
     prediction_id = cursor.lastrowid
     conn.commit()
-    conn.close()
+    cursor.close()
 
-    os.remove(filepath)  # clean up
+    os.remove(filepath)
 
     return jsonify({
         "id": prediction_id,
@@ -144,11 +142,13 @@ def register_submit():
 
     api_key = secrets.token_hex(16)
     try:
-        conn = sqlite3.connect("predictions.db")
+        conn = get_db()
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO users (email, api_key) VALUES (?, ?)", (email, api_key))
+        cursor.execute("INSERT INTO users (email, api_key) VALUES (%s, %s)", (email, api_key))
         conn.commit()
-        conn.close()
+        cursor.close()
         return jsonify({"message": "Account created", "api_key": api_key})
-    except sqlite3.IntegrityError:
-        return jsonify({"error": "Email already registered"}), 409
+    except Exception as e:
+        if "duplicate key" in str(e).lower():
+            return jsonify({"error": "Email already registered"}), 409
+        return jsonify({"error": str(e)}), 500
