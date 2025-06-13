@@ -1,0 +1,86 @@
+{
+  "info": {
+    "name": "BettaVox API",
+    "_postman_id": "c91bb6b3-f1b2-4f5a-8c0e-1fc4cb9fbc67",
+    "description": "Collection to test BettaVox audio prediction API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Predict (Audio Upload)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-KEY",
+            "value": "3133331355dc9d68e0644bfc121eacc1",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "audio",
+              "type": "file",
+              "src": ""
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://127.0.0.1:5000/predict",
+          "protocol": "http",
+          "host": ["127", "0", "0", "1"],
+          "port": "5000",
+          "path": ["predict"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Submit Feedback",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "id",
+              "value": "1",
+              "type": "text"
+            },
+            {
+              "key": "is_correct",
+              "value": "0",
+              "type": "text"
+            },
+            {
+              "key": "corrected_gender",
+              "value": "Female",
+              "type": "text"
+            },
+            {
+              "key": "corrected_age_group",
+              "value": "teen",
+              "type": "text"
+            },
+            {
+              "key": "user_feedback",
+              "value": "Was actually a teenage girl in the clip.",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://127.0.0.1:5000/feedback",
+          "protocol": "http",
+          "host": ["127", "0", "0", "1"],
+          "port": "5000",
+          "path": ["feedback"]
+        }
+      },
+      "response": []
+    }
+  ]
+}
