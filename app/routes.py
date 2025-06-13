@@ -3,7 +3,7 @@ from werkzeug.utils import secure_filename
 from app.utils import extract_features
 from app.model import load_assets
 from app.config import UPLOAD_FOLDER, ALLOWED_EXTENSIONS
-from app.database import get_db  # PostgreSQL connection function
+from app.database import get_db,init_db  # PostgreSQL connection function
 import pandas as pd
 import os
 import json
@@ -174,3 +174,12 @@ def view_predictions():
         ])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+# Inside your Flask app:
+@routes.route("/init-db")
+def init_db_route():
+    try:
+        init_db()
+        return "✅ DB initialized successfully"
+    except Exception as e:
+        return f"❌ Failed: {str(e)}"

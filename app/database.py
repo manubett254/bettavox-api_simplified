@@ -4,7 +4,9 @@ import logging
 import os
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
+from dotenv import load_dotenv
+load_dotenv()
+POSTGRES_URI = os.getenv("POSTGRES_URI")
 def init_db():
     try:
         conn = psycopg2.connect(POSTGRES_URI)
